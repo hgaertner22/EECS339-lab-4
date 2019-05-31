@@ -111,7 +111,7 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return cost1+card1*cost2+card1*card2;
+            return cost1 + card1*cost2 + card1*card2;
         }
     }
 
@@ -155,15 +155,20 @@ public class JoinOptimizer {
             String field2PureName, int card1, int card2, boolean t1pkey,
             boolean t2pkey, Map<String, TableStats> stats,
             Map<String, Integer> tableAliasToId) {
-        int card = 1;
         // some code goes here
-        if(t1pkey)
+        if(joinOp.equals(Predicate.Op.EQUALS)) {
+            if (t1pkey)
+                return card2;
+            if (t2pkey)
+                return card1;
+            if (card1 > card2)
+                return card1;
             return card2;
-        if(t2pkey)
-            return card1;
-        if(card1>card2)
-            return card1;
-        return card2;
+        }
+
+        else {
+            return (int) (card1 * card2 * 0.3);
+        }
     }
 
     /**
@@ -224,30 +229,35 @@ public class JoinOptimizer {
             HashMap<String, Double> filterSelectivities, boolean explain)
             throws ParsingException {
         // some code goes here
-        Set<LogicalJoinNode> j=new HashSet<LogicalJoinNode>(joins);
-        PlanCache pc=new PlanCache();
-        for(int i=1; enumerateSubsets(joins, 1).size()>i; i++) {
-            for(Set<LogicalJoinNode> s: enumerateSubsets(joins, i)) {
-                Vector<LogicalJoinNode> bestPlan=null;
-                double bestCost=1.79*Math.pow(10, 308);
-                int bestCard=2147483647;
-                for(LogicalJoinNode s2: s) {
-                    CostCard cc=computeCostAndCardOfSubplan(stats, filterSelectivities, s2, s, bestCost, pc);
-                    if(cc!=null) {
-                        if(cc.cost<bestCost) {
-                            bestPlan = cc.plan;
-                            bestCost = cc.cost;
+
+        PlanCache pc = new PlanCache();
+        Set<LogicalJoinNode> j = new HashSet<>(joins);
+
+        for(int i=0; i <= enumerateSubsets(joins, 1).size(); i++) {
+            for(Set<LogicalJoinNode> outerSet: enumerateSubsets(joins, i)) {
+                Vector<LogicalJoinNode> bestPlan = null;
+                double bestCost = Double.MAX_VALUE;
+                int bestCard = Integer.MAX_VALUE;
+
+                for(LogicalJoinNode innerSet: outerSet) {
+                    CostCard planCost = computeCostAndCardOfSubplan(stats, filterSelectivities, innerSet, outerSet, bestCost, pc);
+                    if(planCost != null) {
+                        if(planCost.cost < bestCost) {
+                            bestCost = planCost.cost;
+                            bestCard = planCost.card;
+                            bestPlan = planCost.plan;
                         }
                     }
                 }
-                pc.addPlan(s, bestCost, bestCard, bestPlan);
+                pc.addPlan(outerSet, bestCost, bestCard, bestPlan);
             }
         }
-        Vector<LogicalJoinNode> optimal=pc.getOrder(j);
-        if(explain)
+
+        Vector<LogicalJoinNode> optimal = pc.getOrder(j);
+        if(explain) {
             printJoins(optimal, pc, stats, filterSelectivities);
-        if(optimal==null)
-            throw new ParsingException("No plan exists");
+        }
+
         return optimal;
     }
 

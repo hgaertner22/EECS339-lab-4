@@ -198,8 +198,8 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // some code goes here
-        int x=((HeapFile) db).numPages();
-        return ((HeapFile) db).numPages()*this.costperpage;
+        int pageCount =((HeapFile) db).numPages();
+        return pageCount * this.costperpage;
     }
 
     /**
@@ -214,7 +214,7 @@ public class TableStats {
     public int estimateTableCardinality(double selectivityFactor) {
         // some code goes here
 
-        return (int) (this.numTuples*selectivityFactor);
+        return (int) (this.numTuples * selectivityFactor);
     }
 
     /**
